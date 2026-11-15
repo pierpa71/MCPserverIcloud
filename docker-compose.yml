@@ -1,0 +1,36 @@
+services:
+  icloud-mail-mcp:
+    build: .
+    image: icloud-mail-mcp:latest
+    container_name: icloud-mail-mcp
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MCP_TRANSPORT: http
+    ports:
+      # Esposto solo in locale: davanti va un reverse proxy HTTPS o il tunnel qui sotto.
+      # Se il reverse proxy gira su un altro host, usa "8000:8000".
+      - "127.0.0.1:8000:8000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  # Opzionale: Cloudflare Tunnel per pubblicare l'endpoint in HTTPS senza aprire porte.
+  # Avvio:  docker compose --profile tunnel up -d
+  # Nel pannello Cloudflare (Zero Trust > Networks > Tunnels) imposta il public hostname
+  # verso il servizio  http://icloud-mail-mcp:8000
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: icloud-mail-mcp-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - icloud-mail-mcp
+    profiles:
+      - tunnel
